@@ -1,0 +1,22 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: always
+
+  browserless:
+    image: browserless/chrome
+    ports:
+      - "3000:3000"
+    environment:
+      - CONNECTION_TIMEOUT=60000
+    restart: always
