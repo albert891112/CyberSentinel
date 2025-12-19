@@ -1,0 +1,33 @@
+services:
+  redis:
+    image: redis:alpine
+    container_name: cyber_sentinel_redis
+    ports:
+      - "6380:6379"
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  qdrant:
+    image: qdrant/qdrant
+    container_name: cyber_sentinel_qdrant
+    ports:
+      - "6333:6333"
+    restart: always
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  browserless:
+    image: browserless/chrome
+    container_name: cyber_sentinel_browserless
+    ports:
+      - "3000:3000"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - MAX_QUEUE_LENGTH=20
+      - PREBOOT_CHROME=true
+    restart: always
+
+volumes:
+  redis_data:
+  qdrant_data:

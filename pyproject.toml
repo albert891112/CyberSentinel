@@ -1,0 +1,33 @@
+[project]
+name = "cyber-sentinel"
+version = "0.1.0"
+description = "Cognitive Cybersecurity AI Agent"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "pydantic>=2.9.0",
+    "python-dotenv>=1.0.0",
+    "redis>=5.0.0",
+    "qdrant-client>=1.11.0",
+    "httpx>=0.27.0",
+    "scikit-learn>=1.5.0",
+    "numpy>=2.0.0",
+    "dnspython>=2.6.0",
+    "asyncwhois>=1.1.0",
+    "playwright>=1.47.0",
+    "sentence-transformers>=5.2.0",
+    "torch>=2.9.1",
+    "pillow>=12.0.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+    "isort>=5.0.0"
+]
