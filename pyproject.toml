@@ -26,6 +26,7 @@ dependencies = [
     "pandas>=2.3.3",
     "tranco>=0.8.1",
     "tldextract>=5.3.0",
+    "imbalanced-learn>=0.14.1",
 ]
 
 [tool.uv]

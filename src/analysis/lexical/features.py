@@ -1,6 +1,5 @@
 import math
 from urllib.parse import urlparse
-from typing import Dict
 import ipaddress
 
 def calculate_entropy(text: str) -> float:
@@ -34,12 +33,12 @@ def longest_consecutive_consonants(text: str) -> int:
 def is_ip_address(domain: str) -> bool:
     """Checks if the domain is an IP address."""
     try:
-        ipaddress.ip_address(domain)
+        _ = ipaddress.ip_address(domain)
         return True
     except ValueError:
         return False
 
-def extract_features(url: str) -> Dict[str, float]:
+def extract_features(url: str) -> dict[str, float]:
     """
     Extracts lexical features from a given URL based on common characteristics
     of malicious URLs.
@@ -107,5 +106,21 @@ def extract_features(url: str) -> Dict[str, float]:
     # --- Query and Parameter Features ---
     features['query_length'] = float(len(query))
     features['num_query_params'] = float(len(query.split('&'))) if query else 0.0
+
+    # --- Enhanced Features (Literature-based) ---
+    # URL Entropy - higher entropy often indicates malicious/DGA URLs
+    features['url_entropy'] = calculate_entropy(url)
+    
+    # Sensitive Keywords - common phishing indicators
+    suspicious_keywords = {
+        'login', 'admin', 'paypal', 'secure', 'account', 'verify', 
+        'update', 'confirm', 'signin', 'banking', 'password', 'credential',
+        'wallet', 'suspend', 'unusual', 'alert', 'blocked', 'expire'
+    }
+    features['has_sensitive_keyword'] = 1.0 if any(kw in url.lower() for kw in suspicious_keywords) else 0.0
+    
+    # Suspicious File Extensions - often used in malware delivery
+    suspicious_extensions = {'.exe', '.js', '.bat', '.php', '.zip', '.rar', '.scr', '.cmd', '.vbs', '.dll'}
+    features['has_suspicious_extension'] = 1.0 if any(ext in path.lower() for ext in suspicious_extensions) else 0.0
 
     return features
