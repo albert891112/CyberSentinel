@@ -18,7 +18,7 @@ class LexicalAnalyzer:
     """
     Analyzes URLs using lexical features and a trained Random Forest model.
     
-    The analyzer loads the trained model and trigram extractor, then uses
+    The analyzer loads the trained model, scaler, and trigram extractor, then uses
     them to predict whether a URL is malicious or benign.
     """
     
@@ -28,6 +28,7 @@ class LexicalAnalyzer:
         self.model_path = model_path
         self.trigram_path = trigram_path
         self._model = None
+        self._scaler = None
         self._feature_names: list[str] = []
         self._top_domains_set: set[str] = set()
         self._trigram_extractor: TrigramFeatureExtractor | None = None
@@ -45,15 +46,17 @@ class LexicalAnalyzer:
         with open(self.model_path, "rb") as f:
             artifacts = pickle.load(f)
         
-        # Handle both old format (just model) and new format (dict with artifacts)
+        # Handle new format (dict with artifacts)
         if isinstance(artifacts, dict):
             self._model = artifacts["model"]
+            self._scaler = artifacts.get("scaler")
             self._feature_names = artifacts.get("feature_names", [])
             self._top_domains_set = artifacts.get("top_domains_set", set())
         else:
-            # Legacy format - just the model
+            # Legacy format - just the model (no scaler support)
             self._model = artifacts
             self._feature_names = []
+            self._scaler = None
         
         # Load trigram extractor if available
         if os.path.exists(self.trigram_path):
@@ -74,23 +77,37 @@ class LexicalAnalyzer:
             - prediction: String prediction ("Benign" or "Malicious")
             - features: Subset of extracted features for transparency
         """
-        # Extract lexical features
-        features = extract_features(url)
+        # 1. Extract lexical features
+        features = extract_features(url, top_domains=self._top_domains_set)
         
-        # Extract trigram features if extractor is available
+        # 2. Extract trigram features if extractor is available
         if self._trigram_extractor and self._trigram_extractor.top_trigrams:
             trigram_feats = self._trigram_extractor.transform(url)
             features.update(trigram_feats)
         
-        # Create feature DataFrame
+        # 3. Create raw feature DataFrame
         feat_df = pd.DataFrame([features])
         
-        # Align with training features if available
+        # 4. Align with training features (Filter & Order)
+        # This handles filtering of correlated features by keeping only 
+        # what's in _feature_names
         if self._feature_names:
             feat_df = feat_df.reindex(columns=self._feature_names, fill_value=0)
         
-        # Predict probability of being malicious (class 1)
-        risk_score = float(self._model.predict_proba(feat_df)[0][1])
+        # 5. Apply Scaling (if scaler exists)
+        if self._scaler:
+            try:
+                # Transform returns numpy array, wrap back to DF 
+                # to ensure column name consistency if needed (though predict accepts array)
+                feat_scaled = self._scaler.transform(feat_df)
+            except Exception as e:
+                print(f"[!] Scaling failed: {e}. Using unscaled features.")
+                feat_scaled = feat_df
+        else:
+            feat_scaled = feat_df
+        
+        # 6. Predict probability of being malicious (class 1)
+        risk_score = float(self._model.predict_proba(feat_scaled)[0][1])
         
         # Determine classification (threshold 0.5)
         is_malicious = risk_score > 0.5

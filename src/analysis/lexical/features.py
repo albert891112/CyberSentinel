@@ -38,13 +38,14 @@ def is_ip_address(domain: str) -> bool:
     except ValueError:
         return False
 
-def extract_features(url: str) -> dict[str, float]:
+def extract_features(url: str, top_domains: set[str] | None = None) -> dict[str, float]:
     """
     Extracts lexical features from a given URL based on common characteristics
     of malicious URLs.
 
     Args:
         url: The URL string to analyze.
+        top_domains: Optional set of popular domains (e.g. Tranco/Alexa) for reputation check.
 
     Returns:
         A dictionary where keys are feature names and values are the
@@ -88,6 +89,14 @@ def extract_features(url: str) -> dict[str, float]:
     suspicious_tlds = {'xyz', 'top', 'club', 'site', 'online', 'live', 'info', 'loan', 'work', 'gdn', 'link', 'click'}
     tld = domain.split('.')[-1]
     features['suspicious_tld'] = 1.0 if tld in suspicious_tlds else 0.0
+    
+    # Check if domain is in top domains list
+    if top_domains:
+        # Check both exact domain and "www." stripped version
+        base_domain = domain.removeprefix("www.")
+        features['is_top_domain'] = 1.0 if (domain in top_domains or base_domain in top_domains) else 0.0
+    else:
+        features['is_top_domain'] = 0.0
     
     # --- Subdomain and Path Characteristics ---
     features['subdomain_levels'] = float(domain.count('.'))
