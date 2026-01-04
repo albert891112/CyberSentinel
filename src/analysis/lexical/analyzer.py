@@ -29,7 +29,9 @@ class LexicalAnalyzer:
         self.trigram_path = trigram_path
         self._model = None
         self._scaler = None
-        self._feature_names: list[str] = []
+        self._selector = None  # SFM feature selector
+        self._feature_names: list[str] = []  # Pre-SFM features 
+        self._selected_features: list[str] = []  # Post-SFM features
         self._top_domains_set: set[str] = set()
         self._trigram_extractor: TrigramFeatureExtractor | None = None
         self._load_artifacts()
@@ -50,13 +52,17 @@ class LexicalAnalyzer:
         if isinstance(artifacts, dict):
             self._model = artifacts["model"]
             self._scaler = artifacts.get("scaler")
+            self._selector = artifacts.get("selector")  # SFM selector
             self._feature_names = artifacts.get("feature_names", [])
+            self._selected_features = artifacts.get("selected_features", [])
             self._top_domains_set = artifacts.get("top_domains_set", set())
         else:
             # Legacy format - just the model (no scaler support)
             self._model = artifacts
             self._feature_names = []
+            self._selected_features = []
             self._scaler = None
+            self._selector = None
         
         # Load trigram extractor if available
         if os.path.exists(self.trigram_path):
@@ -88,17 +94,26 @@ class LexicalAnalyzer:
         # 3. Create raw feature DataFrame
         feat_df = pd.DataFrame([features])
         
-        # 4. Align with training features (Filter & Order)
-        # This handles filtering of correlated features by keeping only 
-        # what's in _feature_names
+        # 4. Align with training features (Filter correlated features)
+        # Use pre-SFM feature_names if available
         if self._feature_names:
             feat_df = feat_df.reindex(columns=self._feature_names, fill_value=0)
         
-        # 5. Apply Scaling (if scaler exists)
+        # 5. Apply SFM Feature Selection (if selector exists)
+        if self._selector:
+            try:
+                feat_selected = self._selector.transform(feat_df)
+                # Use selected_features for column names
+                if self._selected_features:
+                    feat_df = pd.DataFrame(feat_selected, columns=self._selected_features)
+                else:
+                    feat_df = pd.DataFrame(feat_selected)
+            except Exception as e:
+                print(f"[!] SFM selection failed: {e}. Using filtered features.")
+        
+        # 6. Apply Scaling (if scaler exists)
         if self._scaler:
             try:
-                # Transform returns numpy array, wrap back to DF 
-                # to ensure column name consistency if needed (though predict accepts array)
                 feat_scaled = self._scaler.transform(feat_df)
             except Exception as e:
                 print(f"[!] Scaling failed: {e}. Using unscaled features.")

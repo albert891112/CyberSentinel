@@ -59,6 +59,20 @@ class TestFeatureExtraction:
         feats = extract_features("https://google.com")
         assert "url_entropy" in feats
         assert feats["url_entropy"] > 0
+    
+    def test_vowel_ratio_feature(self):
+        """Test vowel_ratio feature from Abdul Hamid et al."""
+        url = "https://aeiou.com"
+        feats = extract_features(url)
+        assert "vowel_ratio" in feats
+        assert feats["vowel_ratio"] > 0
+    
+    def test_long_word_count_feature(self):
+        """Test long_word_count feature from Abdul Hamid et al."""
+        url = "https://verylongdomainname.com/anotherlongpath"
+        feats = extract_features(url)
+        assert "long_word_count" in feats
+        assert feats["long_word_count"] >= 1
 
 
 class TestTrigramFeatures:
