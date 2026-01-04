@@ -5,19 +5,19 @@ from typing import Dict, Any
 class WhoisClient:
     async def get_whois_info(self, domain: str) -> Dict[str, Any]:
         try:
-            result = await asyncwhois.aio_lookup(domain)
-            parser_output = result.parser_output
+            # 新版 asyncwhois API: aio_whois 回傳 (query_string, parsed_dict) 元組
+            query_string, parsed_dict = await asyncwhois.aio_whois(domain)
             
             # Normalize dates
-            created = parser_output.get("created") or parser_output.get("creation_date") or parser_output.get("registration_date")
+            created = parsed_dict.get("created") or parsed_dict.get("creation_date") or parsed_dict.get("registration_date")
             if isinstance(created, list):
                 created = created[0]
 
             # Fallback: Regex on raw output
-            if not created and result.query_output:
+            if not created and query_string:
                 import re
                 # Match Creation Date: YYYY-MM-DD or similar
-                match = re.search(r'(?i)(creation|registration)\s*date:\s*([0-9-]{10})', result.query_output)
+                match = re.search(r'(?i)(creation|registration)\s*date:\s*([0-9-]{10})', query_string)
                 if match:
                     created = match.group(2)
             
@@ -35,10 +35,10 @@ class WhoisClient:
                      age_days = (datetime.datetime.now(created.tzinfo) - created).days
 
             return {
-                "registrar": parser_output.get("registrar"),
+                "registrar": parsed_dict.get("registrar"),
                 "created_date": str(created),
                 "age_days": age_days,
-                "raw": result.query_output
+                "raw": query_string
             }
         except Exception as e:
             return {"error": str(e)}
