@@ -23,23 +23,13 @@ import os
 import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-
+from google.cloud import webrisk_v1
+from google.cloud.webrisk_v1.services.web_risk_service import WebRiskServiceClient
 from src.core.cache import cache, WEBRISK_THREAT_TYPES
 
 # 設定日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Google Web Risk API 相關 imports
-try:
-    from google.cloud import webrisk_v1
-    from google.cloud.webrisk_v1.services.web_risk_service import WebRiskServiceClient
-    WEBRISK_AVAILABLE = True
-except ImportError:
-    webrisk_v1 = None  # type: ignore
-    WebRiskServiceClient = None  # type: ignore
-    WEBRISK_AVAILABLE = False
-
 
 class WebRiskSyncService:
     """
@@ -50,15 +40,13 @@ class WebRiskSyncService:
     """
     
     def __init__(self):
-        self._client: Optional["WebRiskServiceClient"] = None  # type: ignore
+        self._client: Optional[WebRiskServiceClient] = None
         self._sync_interval = int(os.getenv("WEBRISK_SYNC_INTERVAL", "1800"))
         self._running = False
         
     @property
     def client(self):
         """懶加載 Web Risk 客戶端"""
-        if not WEBRISK_AVAILABLE:
-            return None
         if self._client is None:
             try:
                 self._client = WebRiskServiceClient()
@@ -69,8 +57,6 @@ class WebRiskSyncService:
     
     def _threat_type_to_enum(self, threat_type_name: str):
         """將威脅類型名稱轉換為 API 枚舉值"""
-        if not WEBRISK_AVAILABLE:
-            return None
         return getattr(webrisk_v1.ThreatType, threat_type_name, None)
     
     async def sync_threat_list(self, threat_type: str) -> Dict[str, Any]:
@@ -87,9 +73,6 @@ class WebRiskSyncService:
         Returns:
             Dict 包含同步結果
         """
-        if not WEBRISK_AVAILABLE:
-            return {"error": "google-cloud-webrisk package not installed"}
-        
         client = self.client
         if client is None:
             return {"error": "Web Risk client unavailable"}
@@ -97,7 +80,7 @@ class WebRiskSyncService:
         try:
             # 獲取當前版本狀態
             version_token = await cache.get_threat_list_state(threat_type)
-            
+             
             # 轉換威脅類型
             threat_enum = self._threat_type_to_enum(threat_type)
             if threat_enum is None:
@@ -213,10 +196,6 @@ class WebRiskSyncService:
         這是一個無限迴圈，定期同步威脅清單。
         適合作為背景任務運行。
         """
-        if not WEBRISK_AVAILABLE:
-            logger.error("google-cloud-webrisk not installed, sync worker cannot start")
-            return
-        
         self._running = True
         logger.info(f"Starting Web Risk sync worker (interval: {self._sync_interval}s)")
         
