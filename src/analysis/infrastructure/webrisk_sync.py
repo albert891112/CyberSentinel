@@ -31,6 +31,97 @@ from src.core.cache import cache, WEBRISK_THREAT_TYPES
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# =============================================
+# Rice-Golomb 解碼器
+# =============================================
+
+class BitReader:
+    """位元讀取器，用於處理 Rice-Golomb 編碼的二進位資料"""
+    
+    def __init__(self, data: bytes):
+        self.data = data
+        self.byte_idx = 0
+        self.bit_idx = 0  # 0-7, current bit in byte
+        self.data_len = len(data)
+
+    def read_bits(self, num_bits: int) -> int:
+        """讀取指定數量的 bits 並返回整數"""
+        result = 0
+        for _ in range(num_bits):
+            if self.byte_idx >= self.data_len:
+                raise EOFError("End of stream reached")
+            
+            # 從 MSB 讀到 LSB (Google Web Risk 規範)
+            current_byte = self.data[self.byte_idx]
+            bit = (current_byte >> (7 - self.bit_idx)) & 1
+            
+            result = (result << 1) | bit
+            
+            self.bit_idx += 1
+            if self.bit_idx == 8:
+                self.bit_idx = 0
+                self.byte_idx += 1
+        return result
+
+    def read_unary(self) -> int:
+        """讀取 Unary 編碼 (計算連續的 0，直到遇到 1)"""
+        count = 0
+        while True:
+            bit = self.read_bits(1)
+            if bit == 1:
+                break
+            count += 1
+        return count
+
+
+def decode_rice_golomb(
+    encoded_data: bytes,
+    first_value: int,
+    rice_parameter: int,
+    entry_count: int
+) -> list[int]:
+    """
+    解碼 Rice-Golomb 壓縮資料。
+    
+    Args:
+        encoded_data: API 回傳的壓縮 bytes
+        first_value: rice_hashes.first_value
+        rice_parameter: rice_hashes.rice_parameter (k)
+        entry_count: rice_hashes.entry_count
+        
+    Returns:
+        解碼後的 hash prefix 整數列表
+    """
+    hashes = []
+    
+    # 第一個值直接加入
+    current_hash = first_value
+    hashes.append(current_hash)
+    
+    reader = BitReader(encoded_data)
+    
+    # 解碼剩餘的 entry_count - 1 個值
+    for _ in range(entry_count - 1):
+        try:
+            # Quotient (Unary coding)
+            q = reader.read_unary()
+            
+            # Remainder (Binary coding, k bits)
+            r = reader.read_bits(rice_parameter)
+            
+            # Delta = q * (2^k) + r
+            delta = (q << rice_parameter) + r
+            
+            # 累加
+            current_hash += delta
+            hashes.append(current_hash)
+            
+        except EOFError:
+            break
+            
+    return hashes
+
 class WebRiskSyncService:
     """
     Web Risk 威脅清單同步服務。
@@ -94,7 +185,6 @@ class WebRiskSyncService:
                     max_diff_entries=10000,  # 每次最多處理的條目數
                     max_database_entries=500000,  # 本地資料庫最大條目數
                     supported_compressions=[
-                        webrisk_v1.CompressionType.RAW,
                         webrisk_v1.CompressionType.RICE,
                     ]
                 )
@@ -117,53 +207,85 @@ class WebRiskSyncService:
                 "removals": 0,
             }
             
-            # 檢查回應類型
+            # 步驟 8：處理 RESET - 清空資料並刪除 token
             if response.response_type == webrisk_v1.ComputeThreatListDiffResponse.ResponseType.RESET:
-                # 完整重置：清空現有資料並重新建立
                 logger.info(f"Performing full reset for {threat_type}")
                 await cache.clear_threat_list(threat_type)
+                # 清除 version token，強迫下次進行全量更新
+                await cache.delete_threat_list_state(threat_type)
             
-            # 處理移除項目
+            # 步驟 6：先處理移除 (BEFORE additions!)
+            # 關鍵：必須在新增之前處理移除，且索引由大到小排序
             if response.removals:
                 removal_indices = []
+                
+                # 處理原始索引格式
                 if response.removals.raw_indices:
                     removal_indices = list(response.removals.raw_indices.indices)
-                # 注意：移除是按照索引進行的，這裡需要更複雜的邏輯
-                # 對於簡化實作，我們在 RESET 時清空所有資料
-                stats["removals"] = len(removal_indices)
-                logger.info(f"Removals for {threat_type}: {len(removal_indices)} indices (handled via RESET)")
+                
+                # 處理 Rice 壓縮的索引
+                if response.removals.rice_indices:
+                    rice_idx = response.removals.rice_indices
+                    decoded_indices = decode_rice_golomb(
+                        rice_idx.encoded_data,
+                        rice_idx.first_value,
+                        rice_idx.rice_parameter,
+                        rice_idx.entry_count
+                    )
+                    removal_indices.extend(decoded_indices)
+                
+                if removal_indices:
+                    # 使用新的 remove_by_indices 方法 (內部會由大到小排序)
+                    removed = await cache.remove_by_indices(threat_type, removal_indices)
+                    stats["removals"] = removed
+                    logger.info(f"Removed {removed} prefixes for {threat_type} (from {len(removal_indices)} indices)")
             
-            # 處理新增項目
+            # 步驟 7：處理新增項目
             if response.additions:
                 prefixes_to_add = []
                 
                 # 處理原始資料格式
                 if response.additions.raw_hashes:
-                    raw_data = response.additions.raw_hashes.raw_hashes
-                    prefix_size = response.additions.raw_hashes.prefix_size
-                    
-                    # 將原始資料分割為獨立的前綴
-                    for i in range(0, len(raw_data), prefix_size):
-                        prefix = raw_data[i:i + prefix_size]
-                        if len(prefix) == prefix_size:
-                            prefixes_to_add.append(bytes(prefix))
+                    for raw_hash_entry in response.additions.raw_hashes:
+                        raw_data = raw_hash_entry.raw_hashes
+                        prefix_size = raw_hash_entry.prefix_size
+                        
+                        # 將原始 bytes 轉為整數 (用於 ZSET)
+                        for i in range(0, len(raw_data), prefix_size):
+                            prefix_bytes = raw_data[i:i + prefix_size]
+                            if len(prefix_bytes) == prefix_size:
+                                # 轉為整數
+                                prefix_int = int.from_bytes(prefix_bytes, byteorder='big')
+                                prefixes_to_add.append(prefix_int)
                 
-                # 處理 Rice 壓縮格式 (如果有的話)
-                # 注意：Rice 解壓縮需要額外實作，這裡只處理原始格式
+                # 處理 Rice-Golomb 壓縮格式
+                if response.additions.rice_hashes:
+                    rice_hashes = response.additions.rice_hashes
+                    decoded_hashes = decode_rice_golomb(
+                        rice_hashes.encoded_data,
+                        rice_hashes.first_value,
+                        rice_hashes.rice_parameter,
+                        rice_hashes.entry_count
+                    )
+                    prefixes_to_add.extend(decoded_hashes)
                 
                 if prefixes_to_add:
                     added = await cache.add_hash_prefixes(threat_type, prefixes_to_add)
                     stats["additions"] = added
                     logger.info(f"Added {added} prefixes for {threat_type}")
             
-            # 保存新的版本狀態
+            # 步驟 8：保存新的 version token
             if response.new_version_token:
                 await cache.set_threat_list_state(threat_type, response.new_version_token)
             
             # 記錄推薦的下次同步時間
             if response.recommended_next_diff:
-                next_diff_seconds = response.recommended_next_diff.seconds
-                stats["recommended_next_diff_seconds"] = next_diff_seconds
+                # recommended_next_diff 是 Timestamp，轉換為秒數計算
+                next_diff_time = response.recommended_next_diff
+                now = datetime.now(timezone.utc)
+                # 使用 timestamp() 方法獲取 POSIX timestamp 進行計算
+                next_diff_seconds = int(next_diff_time.timestamp() - now.timestamp())
+                stats["recommended_next_diff_seconds"] = max(0, next_diff_seconds)
                 logger.info(f"Recommended next diff for {threat_type}: {next_diff_seconds}s")
             
             # 獲取當前清單大小

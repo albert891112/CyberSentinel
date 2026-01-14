@@ -8,7 +8,7 @@ def _compute_diff():
         max_diff_entries=10000,  # 每次最多處理的條目數
         max_database_entries=500000,  # 本地資料庫最大條目數
         supported_compressions=[
-            webrisk_v1.CompressionType.RICE,
+            webrisk_v1.CompressionType.RAW,
         ]
     )
     
