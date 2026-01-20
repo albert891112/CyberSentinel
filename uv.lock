@@ -469,6 +469,7 @@ dependencies = [
     { name = "google-cloud-webrisk" },
     { name = "httpx" },
     { name = "imbalanced-learn" },
+    { name = "kagglehub" },
     { name = "langchain" },
     { name = "langchain-openai" },
     { name = "langgraph" },
@@ -508,6 +509,7 @@ requires-dist = [
     { name = "google-cloud-webrisk", specifier = ">=1.19.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "imbalanced-learn", specifier = ">=0.14.1" },
+    { name = "kagglehub", specifier = ">=0.4.0" },
     { name = "langchain", specifier = ">=0.3.0" },
     { name = "langchain-openai", specifier = ">=0.2.0" },
     { name = "langgraph", specifier = ">=0.2.0" },
@@ -1553,6 +1555,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/26/2d/ef58fed122b268c69c0aa099da20bc67657cdfb2e222688d5731bd5b971d/jupyterlab_widgets-3.0.16.tar.gz", hash = "sha256:423da05071d55cf27a9e602216d35a3a65a3e41cdf9c5d3b643b814ce38c19e0", size = 897423, upload-time = "2025-11-01T21:11:29.724Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/b5/36c712098e6191d1b4e349304ef73a8d06aed77e56ceaac8c0a306c7bda1/jupyterlab_widgets-3.0.16-py3-none-any.whl", hash = "sha256:45fa36d9c6422cf2559198e4db481aa243c7a32d9926b500781c830c80f7ecf8", size = 914926, upload-time = "2025-11-01T21:11:28.008Z" },
+]
+
+[[package]]
+name = "kagglehub"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "kagglesdk" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/77/62/b13bad6e3f3b8527986793ba53ba9d4c10dd1fd6a74f8564fb26b2ce9c14/kagglehub-0.4.0.tar.gz", hash = "sha256:abed91c5b4736996f242f9ca4fc3bdf4d97b11c8b5a0a636ffb02db219a11b12", size = 114375, upload-time = "2026-01-08T15:20:25.477Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/0b/696bf3479afa593493be4a30416263e3a0677479306e8d7088fd95729987/kagglehub-0.4.0-py3-none-any.whl", hash = "sha256:1ba266dd87fe4934eb4de1a2ecfd10cc190228733e6d7852c04ba899adb02c67", size = 69187, upload-time = "2026-01-08T15:20:23.854Z" },
+]
+
+[[package]]
+name = "kagglesdk"
+version = "0.1.15"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2d/1b/21bc2a37c7d194c4335a4f4a821ba42f706a0ea5b2ee4d338c8e04cf8b0e/kagglesdk-0.1.15.tar.gz", hash = "sha256:a26ecc64b1334b5a4c5cadd076bdeb503c04eab51c10d7cac2ff04959c9baba0", size = 120912, upload-time = "2026-01-15T23:20:08.485Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/d8/71a8b9115ed2cf8b487c8976e66678311e82c73980e103eda15623abd6a5/kagglesdk-0.1.15-py3-none-any.whl", hash = "sha256:f7b49e795d5d0d72ba3612e6e6a1f39296978dbc7cd44d2015502e8bb1039738", size = 160357, upload-time = "2026-01-15T23:20:06.988Z" },
 ]
 
 [[package]]

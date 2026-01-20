@@ -29,6 +29,7 @@ dependencies = [
     "imbalanced-learn>=0.14.1",
     "rich>=14.2.0",
     "google-cloud-webrisk>=1.19.0",
+    "kagglehub>=0.4.0",
 ]
 
 [tool.uv]

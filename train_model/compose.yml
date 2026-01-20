@@ -1,0 +1,16 @@
+services:
+  train_model:
+    build: .
+    container_name: lexical_model_trainer
+    restart: always
+    environment:
+      # Run training immediately on startup (default: true)
+      - RUN_IMMEDIATELY=${RUN_IMMEDIATELY:-true}
+      # Kaggle credentials (required for kagglehub)
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME:-}
+      - KAGGLE_KEY=${KAGGLE_KEY:-}
+      # Timezone for scheduling
+      - TZ=Asia/Taipei
+    volumes:
+      # Persist trained models
+      - ./models:/app/models
